@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl of Africa Portal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  jungle: { 500:'#10b981', 700:'#047857', 900:'#052e1c' }, sunfire:'#f97316'
+}}}};
+</script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { background: linear-gradient(180deg,#ecfdf5 0%,#fff7ed 50%,#f0f9ff 100%); min-height:100vh; }
+  .custom-scrollbar { max-height: 92vh; overflow-y: auto; }
+  .hero { background: linear-gradient(120deg,#052e1c,#047857,#f59e0b,#ea580c,#047857); background-size: 300% 300%; animation: grad 14s ease infinite; }
+  @keyframes grad { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  .drift { animation: drift 40s linear infinite; } .drift2 { animation: drift 65s linear infinite reverse; }
+  @keyframes drift { from{transform:translateX(-120px)} to{transform:translateX(900px)} }
+  .pulse-sun { animation: sun 4s ease-in-out infinite; transform-origin:center; transform-box:fill-box; }
+  @keyframes sun { 50%{transform:scale(1.12);opacity:.85} }
+  .flow { stroke-dasharray: 14 10; animation: flow 1s linear infinite; }
+  @keyframes flow { to{stroke-dashoffset:-24} }
+  .sway { animation: sway 5s ease-in-out infinite; transform-origin:bottom; transform-box:fill-box; }
+  @keyframes sway { 50%{transform:rotate(2.5deg)} }
+  .bob { animation: bob 3s ease-in-out infinite; }
+  @keyframes bob { 50%{transform:translateY(-6px)} }
+  .puff { animation: puff 4s ease-in infinite; transform-box:fill-box; transform-origin:center; }
+  @keyframes puff { 0%{transform:translateY(0) scale(.6);opacity:.8} 100%{transform:translateY(-60px) scale(1.4);opacity:0} }
+  .spin { animation: spin 30s linear infinite; transform-origin:center; transform-box:fill-box; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .reveal { opacity:0; transform: translateY(24px); transition: all .6s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity:1; transform:none; }
+  .card { transition: transform .25s, box-shadow .25s; transform-style: preserve-3d; }
+  .card:hover { box-shadow: 0 20px 40px -12px var(--accent); }
+  .card .scene img, .card .scene svg { transition: transform .6s; }
+  .card:hover .scene img, .card:hover .scene svg { transform: scale(1.08); }
+  .modal-in { animation: pop .3s cubic-bezier(.2,1.2,.4,1); }
+  @keyframes pop { from{opacity:0;transform:scale(.9) translateY(20px)} to{opacity:1;transform:none} }
+  .heart.on { color:#ef4444; fill:#ef4444; transform:scale(1.25); } .heart { transition: all .2s; }
+  .toast { transition: all .4s; transform: translateY(100px); opacity:0; } .toast.show { transform:none; opacity:1; }
+  .chip { transition: all .2s; } .chip:hover { transform: translateY(-2px) scale(1.04); }
+  .star { cursor:pointer; transition: transform .15s; } .star:hover { transform: scale(1.3); }
+  input[type=range] { accent-color:#f97316; }
+</style>
+</head>
+<body class="font-sans text-gray-800">
+
+<header class="hero sticky top-0 z-40 shadow-lg">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3 text-emerald-50">
+      <i data-lucide="compass" class="w-8 h-8 text-yellow-300 spin"></i>
+      <div>
+        <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 via-white to-emerald-200">PEARL OF AFRICA</span>
+        <p class="text-[10px] text-emerald-100 tracking-widest font-medium uppercase">Eco-Tour, Wildlife & Lodging Portal</p>
+      </div>
+    </div>
+    <nav class="hidden md:flex items-center space-x-1">
+      <button onclick="switchTab('explore')" id="nav-explore" class="nav-btn px-4 py-2 rounded-full text-sm font-medium transition-all"><i data-lucide="compass" class="inline-block w-4 h-4 mr-1.5"></i> Destinations & Lodging</button>
+      <button onclick="switchTab('map-view')" id="nav-map-view" class="nav-btn px-4 py-2 rounded-full text-sm font-medium transition-all"><i data-lucide="map-pin" class="inline-block w-4 h-4 mr-1.5"></i> Interactive Map</button>
+      <button onclick="switchTab('reviews-community')" id="nav-reviews-community" class="nav-btn px-4 py-2 rounded-full text-sm font-medium transition-all"><i data-lucide="camera" class="inline-block w-4 h-4 mr-1.5"></i> Traveler Stories</button>
+    </nav>
+    <div class="flex items-center space-x-2">
+      <button onclick="switchTab('explore'); setFilter('fav')" class="relative p-2 rounded-full bg-white/15 hover:bg-white/30 text-white" title="Favorites">
+        <i data-lucide="heart" class="w-5 h-5"></i>
+        <span id="fav-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">0</span>
+      </button>
+      <button onclick="openBookingModal()" class="hidden sm:flex items-center space-x-2 bg-white text-orange-600 px-5 py-2.5 rounded-full font-bold text-sm shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5 hover:scale-105">
+        <i data-lucide="calculator" class="w-4 h-4"></i><span>Trip Estimator</span>
+      </button>
+      <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-white hover:bg-white/10"><i data-lucide="menu" class="w-6 h-6"></i></button>
+    </div>
+  </div>
+  <div id="mobile-menu" class="hidden md:hidden px-4 pt-2 pb-4 space-y-2 border-t border-white/20 bg-jungle-900">
+    <button onclick="switchTab('explore')" class="w-full text-left px-3 py-2 rounded-md text-white hover:bg-jungle-700">Explore Destinations</button>
+    <button onclick="switchTab('map-view')" class="w-full text-left px-3 py-2 rounded-md text-white hover:bg-jungle-700">Interactive Map</button>
+    <button onclick="switchTab('reviews-community')" class="w-full text-left px-3 py-2 rounded-md text-white hover:bg-jungle-700">Traveler Stories</button>
+    <button onclick="openBookingModal()" class="w-full text-left px-3 py-2 rounded-md text-yellow-300 hover:bg-jungle-700">Trip Estimator</button>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-8">
+  <section id="tab-explore" class="tab">
+    <div class="rounded-3xl overflow-hidden mb-6 relative shadow-xl" id="hero-scene"></div>
+    <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+      <div class="bg-white rounded-2xl p-4 shadow border-b-4 border-emerald-400"><div id="stat-dest" class="text-2xl font-black text-emerald-600">0</div><div class="text-[11px] text-gray-500 font-semibold uppercase">Destinations</div></div>
+      <div class="bg-white rounded-2xl p-4 shadow border-b-4 border-orange-400"><div id="stat-lodge" class="text-2xl font-black text-orange-500">0</div><div class="text-[11px] text-gray-500 font-semibold uppercase">Lodges & Hotels</div></div>
+      <div class="bg-white rounded-2xl p-4 shadow border-b-4 border-sky-400"><div id="stat-from" class="text-2xl font-black text-sky-600">$0</div><div class="text-[11px] text-gray-500 font-semibold uppercase">Cheapest bed / night</div></div>
+    </div>
+    <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl p-3 mb-6 flex gap-2">
+      <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+      <p><b>About prices:</b> Park and permit fees follow the UWA conservation tariff for July 2024 to June 2026; sites marked <span class="font-bold text-emerald-700">✔ UWA</span> were checked against published tariffs, others are marked <span class="font-bold text-orange-600">≈ approx</span>. That tariff period has ended, so confirm current rates with UWA. Lodge rates are indicative per-room nightly prices and vary by season.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <div class="relative flex-1 min-w-[200px]">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-gray-400"></i>
+        <input id="search" oninput="renderGrid()" placeholder="Search gorillas, lions, Nile, lodge names…" class="w-full pl-9 pr-3 py-2.5 rounded-full border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+      </div>
+      <select id="region" onchange="renderGrid()" class="px-4 py-2.5 rounded-full border border-gray-200 bg-white shadow-sm text-sm font-semibold"></select>
+      <div class="bg-white rounded-full border border-gray-200 shadow-sm px-4 py-2 text-xs font-semibold flex items-center gap-2">
+        <span>Cheapest bed up to <b id="budget-label" class="text-orange-500">$900</b></span>
+        <input id="budget" type="range" min="20" max="900" step="10" value="900" oninput="renderGrid()" class="w-28">
+      </div>
+    </div>
+    <div id="filters" class="flex flex-wrap gap-2 mb-6"></div>
+    <div id="dest-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    <p class="text-[11px] text-gray-400 mt-8 text-center">Photos from Wikimedia Commons contributors under their respective Creative Commons licenses; open any destination for a credit link. Places without a verified photo show an illustration.</p>
+  </section>
+
+  <section id="tab-map-view" class="tab hidden">
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div id="map" class="lg:col-span-2 w-full h-[70vh] rounded-2xl border-4 border-white shadow-xl"></div>
+      <div id="map-list" class="space-y-2 max-h-[70vh] overflow-y-auto"></div>
+    </div>
+  </section>
+
+  <section id="tab-reviews-community" class="tab hidden">
+    <div class="grid lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 space-y-4" id="stories"></div>
+      <form onsubmit="addStory(event)" class="bg-white rounded-2xl p-5 shadow-lg border-t-4 border-orange-400 space-y-3 h-fit">
+        <h3 class="font-black text-emerald-900">Share your story</h3>
+        <input id="st-name" required placeholder="Your name" class="w-full p-2.5 rounded-xl border text-sm">
+        <select id="st-site" class="w-full p-2.5 rounded-xl border text-sm"></select>
+        <div id="st-stars" class="flex gap-1"></div>
+        <textarea id="st-text" required rows="3" placeholder="What did you see?" class="w-full p-2.5 rounded-xl border text-sm"></textarea>
+        <button class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 text-white font-bold text-sm hover:scale-[1.02] transition">Post story</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<!-- DETAIL MODAL -->
+<div id="detail-modal" onclick="if(event.target===this)closeModal('detail-modal')" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="modal-in bg-white rounded-3xl max-w-4xl w-full shadow-2xl relative custom-scrollbar">
+    <button onclick="closeModal('detail-modal')" class="absolute top-4 right-4 z-10 bg-white/80 rounded-full p-1 text-gray-600 hover:text-red-500 hover:rotate-90 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+    <div id="modal-scene" class="relative rounded-t-3xl overflow-hidden"></div>
+    <div class="px-6 sm:px-8 pt-2 text-[11px] text-gray-400" id="modal-credit"></div>
+    <div class="p-6 sm:p-8 pt-3 space-y-6">
+      <div class="flex justify-between items-start gap-3">
+        <div>
+          <h2 id="modal-title" class="text-2xl font-black text-emerald-900"></h2>
+          <p id="modal-region" class="text-xs text-gray-500 mb-2"></p>
+          <p id="modal-desc" class="text-sm text-gray-700"></p>
+        </div>
+        <button id="modal-fav" class="p-3 rounded-full bg-red-50 hover:bg-red-100"><i data-lucide="heart" class="w-6 h-6 text-red-400"></i></button>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm">Entry & Permit Rates</h4><span id="modal-verified"></span></div>
+        <div id="modal-pricing" class="grid grid-cols-3 gap-3 text-center"></div>
+        <p id="modal-pricing-unit" class="text-[11px] text-gray-500 mt-2"></p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
+          <h4 class="font-bold text-emerald-900 text-sm flex items-center mb-3"><i data-lucide="paw-print" class="w-4 h-4 mr-2 text-emerald-500"></i> Key Wildlife & Fauna</h4>
+          <ul id="modal-fauna" class="text-xs text-gray-700 flex flex-wrap gap-2"></ul>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+          <h4 class="font-bold text-amber-900 text-sm flex items-center mb-3"><i data-lucide="compass" class="w-4 h-4 mr-2 text-orange-500"></i> Tour Activities</h4>
+          <ul id="modal-activities" class="text-xs text-gray-700 space-y-2"></ul>
+        </div>
+      </div>
+      <div class="bg-gradient-to-br from-sky-50 to-emerald-50 border border-gray-200 rounded-2xl p-6 space-y-4">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 class="text-base font-bold text-gray-900 flex items-center"><i data-lucide="hotel" class="w-5 h-5 mr-2 text-emerald-500"></i> Lodges & Hotels Nearby</h3>
+            <p class="text-xs text-gray-500">Indicative nightly room rates. Tiers are relative to the area.</p>
+          </div>
+          <div class="flex bg-white rounded-full p-1 shadow-inner text-xs font-bold" id="tier-tabs"></div>
+        </div>
+        <div id="modal-accommodations-list" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </div>
+      <button id="modal-estimate" class="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold hover:scale-[1.01] transition">Estimate a trip here →</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOOKING MODAL -->
+<div id="booking-modal" onclick="if(event.target===this)closeModal('booking-modal')" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+  <div class="modal-in bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative custom-scrollbar">
+    <button onclick="closeModal('booking-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 hover:rotate-90 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+    <div class="space-y-5">
+      <div>
+        <h3 class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-orange-500">Safari & Accommodation Estimator</h3>
+        <p class="text-xs text-gray-500 mt-1">Park tariffs + lodging, updated as you type.</p>
+      </div>
+      <form id="calc-form" class="space-y-4" onsubmit="handleInquirySubmit(event)">
+        <select id="calc-site" onchange="updateCalcTotal()" class="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-sm font-semibold"></select>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Residency</label>
+            <select id="calc-residency" onchange="updateCalcTotal()" class="w-full p-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-semibold">
+              <option value="fnr">Foreign Non-Resident (USD)</option>
+              <option value="fr">Foreign Resident (USD)</option>
+              <option value="eac">East African Citizen (UGX)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Days: <span id="days-label">2</span></label>
+            <input type="range" id="calc-days" min="1" max="14" value="2" oninput="updateCalcTotal()" class="w-full mt-2">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Accommodation <span class="font-medium normal-case text-gray-400">(uses the real lodges listed for the site)</span></label>
+          <div id="calc-tier" class="grid grid-cols-4 gap-2 text-[11px] font-bold"></div>
+          <p id="calc-lodge-name" class="text-[11px] text-gray-500 mt-1"></p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Adults (16+)</label>
+            <div class="flex items-center gap-2"><button type="button" onclick="step('calc-adults',-1,1)" class="w-8 h-8 rounded-full bg-emerald-100 font-black text-emerald-700">−</button><input id="calc-adults" readonly value="2" class="w-10 text-center font-bold bg-transparent"><button type="button" onclick="step('calc-adults',1,1)" class="w-8 h-8 rounded-full bg-emerald-100 font-black text-emerald-700">+</button></div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Children (5-15)</label>
+            <div class="flex items-center gap-2"><button type="button" onclick="step('calc-children',-1,0)" class="w-8 h-8 rounded-full bg-orange-100 font-black text-orange-700">−</button><input id="calc-children" readonly value="0" class="w-10 text-center font-bold bg-transparent"><button type="button" onclick="step('calc-children',1,0)" class="w-8 h-8 rounded-full bg-orange-100 font-black text-orange-700">+</button></div>
+          </div>
+        </div>
+        <div class="rounded-2xl p-4 text-white shadow-inner bg-gradient-to-r from-emerald-700 via-teal-600 to-sky-600">
+          <div class="flex justify-between items-center">
+            <div><span class="text-xs text-emerald-100 block font-medium">Estimated Total</span><span id="calc-total-price" class="text-3xl font-black text-yellow-300">$0</span></div>
+            <i data-lucide="receipt" class="w-8 h-8 text-emerald-200 bob"></i>
+          </div>
+          <div id="calc-breakdown" class="mt-3 space-y-1 text-[11px] text-emerald-50"></div>
+          <div class="mt-3 h-2 rounded-full bg-white/20 overflow-hidden flex"><div id="bar-entry" class="bg-yellow-300 transition-all duration-500"></div><div id="bar-lodge" class="bg-pink-300 transition-all duration-500"></div></div>
+        </div>
+        <input type="text" required placeholder="Your Full Name" class="w-full p-2.5 rounded-xl border border-gray-200 text-xs">
+        <input type="email" required placeholder="Email Address" class="w-full p-2.5 rounded-xl border border-gray-200 text-xs">
+        <button type="submit" class="w-full py-3 bg-gradient-to-r from-orange-500 to-pink-500 hover:scale-[1.01] text-white font-bold rounded-xl text-sm shadow-md transition-all">Submit Reservation Inquiry</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white px-5 py-3 rounded-full text-sm font-semibold shadow-2xl"></div>
+
+<script>
+/* ---------- Illustrated scenes (animated SVG fallback behind every photo) ---------- */
+const P = { bwindi:['#064e3b','#6ee7b7','#10b981'], mgahinga:['#1e1b4b','#a7f3d0','#6366f1'], kibale:['#14532d','#bef264','#65a30d'],
+  'queen-elizabeth':['#c2410c','#fcd34d','#f97316'], murchison:['#0369a1','#7dd3fc','#0ea5e9'], kidepo:['#7c2d12','#fdba74','#e11d48'],
+  'lake-mburo':['#0e7490','#fde68a','#06b6d4'], rwenzori:['#3730a3','#e0e7ff','#8b5cf6'], 'mt-elgon':['#15803d','#bbf7d0','#16a34a'],
+  semuliki:['#92400e','#fde047','#d97706'], 'uwec-zoo':['#0f766e','#a7f3d0','#14b8a6'], 'ziwa-rhino':['#4338ca','#fde68a','#8b5cf6'],
+  'equator-kayabwe':['#0f172a','#38bdf8','#eab308'], 'jinja-nile':['#be123c','#fdba74','#f43f5e'], bunyonyi:['#0c4a6e','#bae6fd','#0284c7'],
+  'sipi-falls':['#166534','#d9f99d','#22c55e'], kasubi:['#78350f','#fed7aa','#b45309'], 'entebbe-botanical':['#065f46','#99f6e4','#0d9488'] };
+const sky = (id,c)=>`<defs><linearGradient id="sk-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient></defs><rect width="800" height="500" fill="url(#sk-${id})"/><circle class="pulse-sun" cx="620" cy="110" r="46" fill="#fef08a" opacity=".95"/><g class="drift" opacity=".85"><ellipse cx="100" cy="90" rx="60" ry="18" fill="#fff"/><ellipse cx="140" cy="78" rx="40" ry="16" fill="#fff"/></g><g class="drift2" opacity=".7"><ellipse cx="300" cy="150" rx="50" ry="14" fill="#fff"/></g>`;
+const tree = (x,y,s,c)=>`<g class="sway" transform="translate(${x} ${y}) scale(${s})"><rect x="-6" y="-60" width="12" height="60" fill="#78350f"/><circle cx="0" cy="-80" r="34" fill="${c}"/><circle cx="-24" cy="-62" r="24" fill="${c}"/><circle cx="24" cy="-62" r="24" fill="${c}"/></g>`;
+const acacia = (x,y,s)=>`<g class="sway" transform="translate(${x} ${y}) scale(${s})"><path d="M-4 0 L-2 -70 L2 -70 L4 0Z M0 -60 L-30 -90 M0 -60 L30 -90" stroke="#451a03" stroke-width="6" fill="none"/><ellipse cx="0" cy="-95" rx="70" ry="18" fill="#15803d"/></g>`;
+const palm = (x,y,s)=>`<g class="sway" transform="translate(${x} ${y}) scale(${s})"><path d="M0 0 Q6 -60 0 -110" stroke="#78350f" stroke-width="8" fill="none"/><path d="M0 -110 q-50 -10 -70 30 M0 -110 q50 -10 70 30 M0 -110 q-30 -40 -60 -30 M0 -110 q30 -40 60 -30" stroke="#16a34a" stroke-width="9" fill="none" stroke-linecap="round"/></g>`;
+const bird = (x,y)=>`<path class="bob" d="M${x} ${y} q10 -12 20 0 q10 -12 20 0" stroke="#111" stroke-width="2.5" fill="none"/>`;
+const falls = (x,w,y0,y1)=>`<rect x="${x}" y="${y0}" width="${w}" height="${y1-y0}" fill="#e0f2fe" opacity=".85"/><g stroke="#fff" stroke-width="6"><line class="flow" x1="${x+w*.25}" y1="${y0}" x2="${x+w*.25}" y2="${y1}"/><line class="flow" x1="${x+w*.7}" y1="${y0}" x2="${x+w*.7}" y2="${y1}" style="animation-duration:.7s"/></g>`;
+const scenes = {
+  bwindi:(i,c)=>sky(i,c)+`<path d="M0 300 Q200 200 400 290 T800 260 V500H0Z" fill="#065f46"/><path d="M0 360 Q250 280 500 350 T800 330 V500H0Z" fill="#047857"/>`+tree(120,400,1.3,'#059669')+tree(300,420,1.7,'#10b981')+tree(680,410,1.5,'#059669')+bird(200,140)+`<g class="bob" transform="translate(440 430)"><ellipse cx="0" cy="-20" rx="48" ry="40" fill="#1f2937"/><circle cx="0" cy="-70" r="24" fill="#111827"/><ellipse cx="-4" cy="-66" rx="12" ry="10" fill="#4b5563"/><ellipse cx="-50" cy="-10" rx="14" ry="30" fill="#1f2937"/><ellipse cx="50" cy="-10" rx="14" ry="30" fill="#1f2937"/></g>`,
+  mgahinga:(i,c)=>sky(i,c)+`<path d="M60 340 L220 130 L380 340Z" fill="#4b5563"/><path d="M280 340 L450 90 L620 340Z" fill="#6b7280"/><path d="M520 340 L670 160 L800 340Z" fill="#4b5563"/><path d="M420 130 L450 90 L480 130Q450 120 420 130Z" fill="#fff"/><path d="M0 340 Q300 300 800 350 V500H0Z" fill="#047857"/>`+tree(110,430,1.2,'#059669')+tree(690,430,1.3,'#10b981')+`<g class="bob"><circle cx="400" cy="420" r="26" fill="#f59e0b"/><circle cx="400" cy="395" r="14" fill="#fbbf24"/><circle cx="395" cy="392" r="2.5" fill="#111"/><circle cx="406" cy="392" r="2.5" fill="#111"/></g>`,
+  kibale:(i,c)=>sky(i,c)+`<path d="M0 330 Q300 260 800 340 V500H0Z" fill="#15803d"/>`+tree(90,430,1.8,'#166534')+tree(260,440,1.5,'#16a34a')+tree(560,440,1.7,'#15803d')+tree(720,430,1.6,'#166534')+`<path d="M330 150 Q450 190 520 130" stroke="#78350f" stroke-width="12" fill="none"/><g class="bob" transform="translate(430 190)"><ellipse cx="0" cy="25" rx="24" ry="32" fill="#292524"/><circle cx="0" cy="-12" r="17" fill="#292524"/><ellipse cx="0" cy="-8" rx="11" ry="9" fill="#a8a29e"/><circle cx="-4" cy="-13" r="2" fill="#111"/><circle cx="5" cy="-13" r="2" fill="#111"/><path d="M-22 10 Q-40 -30 -20 -50 M22 10 Q40 -30 20 -50" stroke="#292524" stroke-width="9" fill="none" stroke-linecap="round"/></g>`+bird(200,110),
+  'queen-elizabeth':(i,c)=>sky(i,c)+`<path d="M0 330 Q200 300 400 340 T800 320 V500H0Z" fill="#ca8a04"/><path d="M0 400 Q300 360 800 410 V500H0Z" fill="#a16207"/><ellipse cx="400" cy="440" rx="200" ry="26" fill="#0ea5e9" opacity=".8"/>`+acacia(140,360,1.3)+acacia(600,350,1.6)+`<g transform="translate(560 270)"><ellipse cx="0" cy="0" rx="34" ry="14" fill="#d97706"/><circle cx="32" cy="-8" r="13" fill="#b45309"/><circle cx="32" cy="-8" r="19" fill="none" stroke="#7c2d12" stroke-width="5" opacity=".7"/></g>`+bird(300,130)+`<g class="bob"><ellipse cx="380" cy="440" rx="26" ry="12" fill="#78716c"/></g>`,
+  murchison:(i,c)=>sky(i,c)+`<path d="M0 260 L260 260 L300 500 L0 500Z" fill="#92400e"/><path d="M800 260 L520 260 L480 500 L800 500Z" fill="#b45309"/><rect x="300" y="255" width="200" height="245" fill="#38bdf8"/><g stroke="#fff" stroke-width="12" fill="none" opacity=".9"><line class="flow" x1="340" y1="262" x2="340" y2="500"/><line class="flow" x1="400" y1="262" x2="400" y2="500" style="animation-duration:.7s"/><line class="flow" x1="460" y1="262" x2="460" y2="500" style="animation-duration:.85s"/></g>`+acacia(90,270,.8)+acacia(700,270,.9)+bird(250,120)+`<g class="bob"><ellipse cx="150" cy="330" rx="34" ry="16" fill="#6b7280"/><circle cx="175" cy="322" r="10" fill="#6b7280"/></g>`,
+  kidepo:(i,c)=>sky(i,c)+`<path d="M0 320 L180 160 L330 300 L520 130 L800 320 V500H0Z" fill="#7e22ce" opacity=".75"/><path d="M0 380 Q250 320 500 380 T800 360 V500H0Z" fill="#b45309"/><path d="M0 440 Q300 400 800 450 V500H0Z" fill="#92400e"/>`+[0,1,2,3,4].map(n=>`<g class="bob" style="animation-delay:${n*.4}s"><ellipse cx="${180+n*110}" cy="${430+(n%2)*14}" rx="30" ry="16" fill="#1f2937"/><circle cx="${205+n*110}" cy="${424+(n%2)*14}" r="10" fill="#111"/></g>`).join('')+bird(240,110),
+  'lake-mburo':(i,c)=>sky(i,c)+`<path d="M0 330 Q300 300 800 340 V500H0Z" fill="#a3a635"/><ellipse cx="400" cy="400" rx="260" ry="40" fill="#0ea5e9" opacity=".8"/>`+acacia(110,350,1.1)+acacia(700,350,1.2)+`<g class="bob" transform="translate(300 450)"><ellipse cx="0" cy="-20" rx="48" ry="24" fill="#f8fafc"/><path d="M-30 -42 v36 M-14 -44 v40 M2 -44 v40 M18 -42 v36 M32 -38 v30" stroke="#111" stroke-width="5"/><circle cx="52" cy="-34" r="14" fill="#f8fafc"/><path d="M48 -48 v22 M58 -46 v20" stroke="#111" stroke-width="4"/></g>`+bird(480,120),
+  rwenzori:(i,c)=>sky(i,c)+`<path d="M0 360 L150 220 L260 300 L400 110 L540 290 L650 190 L800 340 V500H0Z" fill="#4c1d95"/><path d="M370 140 L400 110 L430 140 L412 134 L400 150 L388 134Z M620 215 L650 190 L680 215 L660 212 L650 225 L640 212Z M120 245 L150 220 L180 245 L160 242 L150 255 L140 242Z" fill="#fff"/><rect y="320" width="800" height="40" fill="#fff" opacity=".35" class="drift2"/><path d="M0 400 Q300 360 800 410 V500H0Z" fill="#166534"/>`+tree(150,440,1.2,'#14532d')+tree(620,440,1.1,'#166534'),
+  'mt-elgon':(i,c)=>sky(i,c)+`<path d="M0 360 Q200 220 330 200 L400 230 L470 200 Q620 220 800 360 V500H0Z" fill="#15803d"/><path d="M330 200 L400 230 L470 200" stroke="#14532d" stroke-width="6" fill="none"/><path d="M0 420 Q400 360 800 430 V500H0Z" fill="#166534"/>`+tree(120,450,1.2,'#14532d')+tree(680,450,1.2,'#14532d')+`<g class="bob"><circle cx="300" cy="345" r="6" fill="#ef4444"/><rect x="296" y="351" width="8" height="16" fill="#1d4ed8"/><circle cx="330" cy="333" r="6" fill="#facc15"/><rect x="326" y="339" width="8" height="16" fill="#0f766e"/></g>`+bird(500,100),
+  semuliki:(i,c)=>sky(i,c)+`<path d="M0 340 Q300 320 800 350 V500H0Z" fill="#4d7c0f"/><ellipse cx="400" cy="440" rx="130" ry="26" fill="#67e8f9"/><ellipse cx="400" cy="436" rx="90" ry="14" fill="#a5f3fc"/>`+[0,1,2,3].map(n=>`<circle class="puff" cx="${360+n*26}" cy="425" r="16" fill="#fff" opacity=".7" style="animation-delay:${n*.9}s"/>`).join('')+palm(120,430,1.3)+palm(250,440,1)+palm(680,430,1.4)+palm(580,440,1),
+  'uwec-zoo':(i,c)=>sky(i,c)+`<path d="M0 360 Q300 320 800 370 V500H0Z" fill="#22c55e"/><rect y="420" width="800" height="80" fill="#0ea5e9" opacity=".7"/>`+tree(110,400,1.2,'#16a34a')+tree(690,400,1.3,'#15803d')+`<g class="sway" transform="translate(400 400)"><rect x="-30" y="-60" width="60" height="50" rx="20" fill="#fbbf24"/><rect x="18" y="-210" width="16" height="160" fill="#fbbf24"/><ellipse cx="34" cy="-218" rx="26" ry="14" fill="#fbbf24"/><rect x="-22" y="-12" width="9" height="42" fill="#f59e0b"/><rect x="14" y="-12" width="9" height="42" fill="#f59e0b"/><circle cx="-8" cy="-40" r="7" fill="#92400e"/><circle cx="10" cy="-30" r="6" fill="#92400e"/></g>`+bird(220,120),
+  'ziwa-rhino':(i,c)=>sky(i,c)+`<path d="M0 340 Q300 310 800 350 V500H0Z" fill="#84cc16"/><path d="M0 410 Q400 380 800 420 V500H0Z" fill="#65a30d"/>`+acacia(150,350,1.1)+acacia(670,350,1)+`<g class="bob" transform="translate(400 430)"><rect x="-70" y="-50" width="130" height="56" rx="26" fill="#9ca3af"/><circle cx="68" cy="-26" r="26" fill="#9ca3af"/><path d="M84 -34 L120 -62 L96 -20Z" fill="#e5e7eb"/><rect x="-54" y="0" width="16" height="34" fill="#6b7280"/><rect x="26" y="0" width="16" height="34" fill="#6b7280"/></g>`+bird(260,130),
+  'equator-kayabwe':(i,c)=>sky(i,c)+`<path d="M0 400 Q400 360 800 400 V500H0Z" fill="#166534"/><g class="spin"><circle cx="400" cy="270" r="120" fill="#0ea5e9"/><path d="M330 220 q30 -30 60 0 t50 30 q-10 40 -50 50 t-60 -20Z" fill="#4ade80"/><path d="M420 300 q20 -20 40 5 t-10 40 q-30 0 -30 -45Z" fill="#4ade80"/></g><line x1="240" y1="270" x2="560" y2="270" stroke="#ef4444" stroke-width="8" stroke-dasharray="20 10"/><circle cx="400" cy="270" r="124" fill="none" stroke="#fde047" stroke-width="4"/><text x="400" y="440" font-family="sans-serif" font-weight="900" font-size="26" fill="#fff" text-anchor="middle">EQUATOR 0° 00′ 00″</text>`,
+  'jinja-nile':(i,c)=>sky(i,c).replace('cy="110"','cy="300"').replace('r="46"','r="70"')+`<rect y="300" width="800" height="200" fill="#0ea5e9"/><rect y="300" width="800" height="200" fill="#be123c" opacity=".25"/><g stroke="#fff" stroke-width="3" opacity=".6">`+[330,360,395,430,470].map((y,n)=>`<line class="flow" x1="40" y1="${y}" x2="760" y2="${y}" style="animation-duration:${1.5+n*.3}s"/>`).join('')+`</g><g class="bob" transform="translate(420 380)"><path d="M-50 0 L50 0 L36 20 L-36 20Z" fill="#78350f"/><path d="M0 -70 L0 0 L40 0Z" fill="#fff"/></g>`+palm(90,330,1.2)+palm(720,330,1.1),
+  bunyonyi:(i,c)=>sky(i,c)+`<path d="M0 300 Q200 220 400 290 T800 250 V500H0Z" fill="#15803d"/><path d="M0 330 Q200 270 400 320 T800 300 V500H0Z" fill="#22c55e"/><path d="M0 360 Q250 330 500 360 T800 350 V500H0Z" fill="#4ade80"/><rect y="390" width="800" height="110" fill="#0284c7"/><ellipse cx="220" cy="410" rx="70" ry="16" fill="#166534"/><ellipse cx="560" cy="425" rx="90" ry="18" fill="#15803d"/><g class="bob" transform="translate(390 450)"><path d="M-50 0 Q0 18 50 0 L40 -8 L-40 -8Z" fill="#78350f"/></g>`+bird(300,120),
+  'sipi-falls':(i,c)=>sky(i,c)+`<path d="M0 220 L800 200 V500H0Z" fill="#166534"/><path d="M0 220 L800 200 V260 L0 280Z" fill="#14532d"/>`+falls(120,60,215,360)+falls(370,80,210,420)+falls(620,50,205,330)+`<path d="M0 420 Q400 380 800 430 V500H0Z" fill="#4ade80"/><ellipse cx="400" cy="440" rx="60" ry="10" fill="#e0f2fe" opacity=".7"/>`+tree(60,470,1,'#15803d')+tree(740,470,1,'#15803d'),
+  kasubi:(i,c)=>sky(i,c)+`<path d="M0 400 Q400 370 800 400 V500H0Z" fill="#65a30d"/><path d="M200 400 Q200 190 400 130 Q600 190 600 400Z" fill="#a16207"/><path d="M200 400 Q200 190 400 130 Q600 190 600 400" fill="none" stroke="#713f12" stroke-width="6"/><g stroke="#713f12" stroke-width="3" opacity=".5">`+[250,300,350,400,450,500,550].map(x=>`<line x1="${x}" y1="${150+Math.abs(x-400)*.3}" x2="${x}" y2="400"/>`).join('')+`</g><path d="M360 400 V320 Q400 290 440 320 V400Z" fill="#1c1917"/><path d="M180 400 H620" stroke="#78350f" stroke-width="10"/>`+bird(110,110),
+  'entebbe-botanical':(i,c)=>sky(i,c)+`<rect y="380" width="800" height="120" fill="#0ea5e9" opacity=".8"/><path d="M0 380 Q400 340 800 385 V400H0Z" fill="#16a34a"/>`+tree(200,420,2.2,'#047857')+tree(560,420,2,'#065f46')+`<g class="bob" transform="translate(330 300)"><ellipse cx="0" cy="14" rx="14" ry="22" fill="#111"/><ellipse cx="0" cy="18" rx="9" ry="14" fill="#fff"/><circle cx="0" cy="-12" r="12" fill="#111"/><path d="M14 20 Q40 40 30 80" stroke="#fff" stroke-width="7" fill="none"/></g>`+bird(480,110)
+};
+const photoUrl=(d,w)=>d.photo?`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(d.photo)}?width=${w}`:'';
+const photoTag=(d,w=900)=>d.photo?`<img src="${photoUrl(d,w)}" alt="${d.name}" loading="lazy" referrerpolicy="no-referrer" class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-700" onload="this.classList.remove('opacity-0')" onerror="this.remove()">`:'';
+const sceneSVG=(d,h='h-48')=>`<svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" class="w-full ${h} block" role="img" aria-label="${d.name} illustration">${scenes[d.id](d.id.replace(/\W/g,''),P[d.id])}</svg>`;
+const sceneWithPhoto=(d,h,w)=>sceneSVG(d,h)+photoTag(d,w);
+
+/* ---------- Data ---------- */
+const L=(tier,name,usd,distance,amenities,ugx)=>({tier,name,rateUsd:usd,rateUgx:ugx||Math.round(usd*3700/5000)*5000,distance,amenities});
+const ugandaDestinations = [
+ { id:'bwindi', name:'Bwindi Impenetrable National Park', category:'park', region:'South-Western Uganda', tags:['Gorilla Trekking','Bird Watching','Hiking'], lat:-1.05, lng:29.6167,
+   photo:'068 Mountain gorilla close-up at Bwindi Impenetrable Forest National Park Photo by Giles Laurent.jpg',
+   description:'A UNESCO World Heritage site and ancient primeval forest. Bwindi shelters roughly half of the world’s remaining mountain gorilla population alongside rare birds and primates.',
+   fauna:['Mountain Gorillas','L’Hoest’s Monkeys','African Green Broadbill','Forest Elephants','Black & White Colobus'],
+   activities:['Gorilla Trekking','Batwa Cultural Experience','Buhoma Craft Trails','Bird Watching Walks'],
+   pricing:{fnr:800,fr:700,eac:300000,unit:'Gorilla permit per person, one-off (includes park entry). Gorilla habituation is $1,500 for foreign non-residents. Low-season discounts may apply (Apr, May, Nov).',oneOff:true,verified:true},
+   accommodations:[ L('Budget','Buhoma Community Rest Camp',35,'0.2 km from Buhoma Main Gate',['Free Wi-Fi','Solar Power','Restaurant','Cultural Performances'],130000), L('Mid-Range','Gorilla Mist Camp (Ruhija)',190,'1.5 km from Ruhija Briefing Point',['Full Board','Valley Views','Bar & Lounge','Hot Showers'],700000), L('Luxury','Clouds Mountain Gorilla Lodge',850,'At Nkuringo Gate Crest',['Personal Butler','Fireplace Suites','Spa & Massage','Volcano Views'],3100000)]},
+ { id:'mgahinga', name:'Mgahinga Gorilla National Park', category:'park', region:'South-Western Uganda', tags:['Gorilla Trekking','Volcano Hiking','Golden Monkeys'], lat:-1.3694, lng:29.6403,
+   photo:'Mgahinga Gorilla National Park, Uganda (31211353130).jpg',
+   description:'Uganda’s smallest national park, set among three Virunga volcanoes. Track gorillas or rare golden monkeys, or hike Mounts Muhabura, Gahinga and Sabyinyo.',
+   fauna:['Mountain Gorillas','Golden Monkeys','Black-and-White Colobus','Forest Elephants','Albertine Rift Endemic Birds'],
+   activities:['Gorilla Trekking','Golden Monkey Tracking','Volcano Hiking','Batwa Trail'],
+   pricing:{fnr:800,fr:700,eac:300000,unit:'Gorilla permit per person, one-off. Golden monkey tracking is about $60 for foreign non-residents.',oneOff:true,verified:true},
+   accommodations:[ L('Budget','Traveller’s Rest Hotel Kisoro',45,'Kisoro town, closest budget base',['Restaurant','Garden','Wi-Fi']), L('Mid-Range','Lake Mutanda Resort',160,'Lake Mutanda shoreline',['Lake Views','Canoeing','Restaurant']), L('Luxury','Mount Gahinga Lodge',650,'Base of the Virunga volcanoes',['Fireplace Cottages','Hot Tubs','Spa','Guided Walks'])]},
+ { id:'kibale', name:'Kibale National Park', category:'park', region:'Western Uganda', tags:['Chimpanzee Tracking','Bird Watching','Primates'], lat:0.45, lng:30.4,
+   photo:'013 Alpha male chimpanzee at Kibale forest National Park Photo by Giles Laurent.jpg',
+   description:'The primate capital of Africa, with 13 primate species and some of the best chimpanzee tracking in the world, set in moist evergreen rainforest near Fort Portal.',
+   fauna:['Chimpanzees','Red Colobus','L’Hoest’s Monkeys','Grey-Cheeked Mangabey','Forest Elephants','Great Blue Turaco'],
+   activities:['Chimpanzee Tracking','Chimp Habituation Experience','Bigodi Wetland Walk','Forest Nature Walks'],
+   pricing:{fnr:250,fr:200,eac:150000,unit:'Chimpanzee tracking permit per person, one-off (includes park entry); minimum age 12.',oneOff:true,verified:true},
+   accommodations:[ L('Budget','Kibale Forest Camp',40,'Edge of the forest near Kanyanchu',['Camping','Restaurant','Guided Walks']), L('Mid-Range','Primate Lodge Kibale',230,'Inside the park near Kanyanchu',['Forest Cottages','Restaurant','Bar']), L('Luxury','Ndali Lodge',480,'Crater lake country near Fort Portal',['Crater Lake Views','Fine Dining','Horse Riding'])]},
+ { id:'queen-elizabeth', name:'Queen Elizabeth National Park', category:'park', region:'Western Uganda', tags:['Big Cats','Bird Watching','Boat Safari'], lat:-0.2, lng:30.0,
+   photo:'051 Lion on a tree at Queen Elizabeth National Park Photo by Giles Laurent.jpg',
+   description:'Famous for diverse ecosystems from savanna to wetlands, the Kazinga Channel hippos, and the legendary tree-climbing lions of Ishasha.',
+   fauna:['Tree-Climbing Lions','Leopards','Kazinga Hippos','Uganda Kob','Chimpanzees (Kyambura)'],
+   activities:['Kazinga Channel Launch Cruise','Ishasha Tree Lion Tracking','Katwe Salt Lake Tour','Kyambura Gorge Chimp Trekking'],
+   pricing:{fnr:40,fr:30,eac:20000,unit:'Park entry per person per day (children about half). Kyambura chimp tracking is about $100 extra; lion tracking about $200.',verified:true},
+   accommodations:[ L('Budget','Pumba Safari Cottages',45,'Kyambura Overlook',['Free Breakfast','Eco-Cottages','Wi-Fi Lounge'],165000), L('Mid-Range','Enganzi Game Lodge',160,'3 km from Park Entrance',['Panoramic Terrace','Full Board','Bar'],590000), L('Luxury','Mweya Safari Lodge',490,'Mweya Peninsula Center',['Sundowner Bar','Channel-view Pool','Air Conditioning'],1800000)]},
+ { id:'murchison', name:'Murchison Falls National Park', category:'park', region:'Northern Uganda', tags:['Big Game','Waterfalls','Boat Safari'], lat:2.25, lng:31.8,
+   photo:'Top of the falls - Murchison Falls National Park Uganda 02.jpg',
+   description:'Uganda’s largest national park, where the Nile squeezes through a 7-metre gorge before plunging 43 metres into a thunderous pool.',
+   fauna:['Nile Crocodiles','Hippos','Rothschild Giraffes','Lions','Elephants','Shoebill Storks'],
+   activities:['Nile Boat Safari to Base of Falls','Top of the Falls Walk','Paraa Game Drives','Hot Air Ballooning'],
+   pricing:{fnr:45,fr:35,eac:25000,unit:'Park entry per person per day (children about $25 for foreign non-residents). Launch cruise and vehicle fees are extra.',verified:true},
+   accommodations:[ L('Budget','Red Chilli Rest Camp',30,'Near Paraa South Bank Ferry',['Camping Grounds','Bar & Grill','Solar Power'],110000), L('Mid-Range','Pakuba Safari Lodge',175,'Inside North Bank Game Loop',['Swimming Pool','River Views','Air Conditioning'],650000), L('Luxury','Paraa Safari Lodge',520,'Overlooking River Nile Banks',['Infinity Pool','Luxury Spa','Fine Dining'],1900000)]},
+ { id:'kidepo', name:'Kidepo Valley National Park', category:'park', region:'Northern Uganda', tags:['Big Game','Hiking','Culture'], lat:3.85, lng:33.85,
+   photo:'Kidepo Valley National Park 01.jpg',
+   description:'Uganda’s most remote wilderness: sweeping savanna plains, rugged mountain backdrops, big buffalo herds and species found nowhere else in the country, like cheetah.',
+   fauna:['Cheetahs','Ostriches','Cape Buffaloes','Jackson’s Hartebeest','Caracals','Lions'],
+   activities:['Narus Valley Game Drive','Kanangorok Hot Springs Trail','Karamojong Cultural Manyattas'],
+   pricing:{fnr:40,fr:30,eac:20000,unit:'Park entry per person per day (approximate; confirm current UWA tariff).'},
+   accommodations:[ L('Budget','UWA Bandas & Apoka Rest Camp',25,'Inside Narus Valley',['Self-Catering Kitchen','Solar Lighting','Campfire'],90000), L('Mid-Range','Kidepo Savannah Lodge',150,'Just outside Kalokudo Gate',['Canvas Tents & Cottages','Valley Views','Restaurant'],550000), L('Luxury','Apoka Safari Lodge',780,'Heart of Kidepo Park',['Plunge Pools','Luxury Canvas Suites','Fine Dining'],2880000)]},
+ { id:'lake-mburo', name:'Lake Mburo National Park', category:'park', region:'Western Uganda', tags:['Zebras','Horseback Safari','Boat Safari'], lat:-0.6278, lng:30.9667,
+   photo:'Evening at Lake Mburo National park.jpg',
+   description:'A compact savanna park on the road west, known for zebras, impalas (found nowhere else in Uganda), elands, and walking, horseback or boat safaris with no elephants to worry about.',
+   fauna:['Burchell’s Zebra','Impala','Eland','Hippos','Rothschild Giraffes','African Finfoot'],
+   activities:['Walking Safari','Horseback Safari','Lake Boat Cruise','Night Game Drive'],
+   pricing:{fnr:40,fr:30,eac:20000,unit:'Park entry per person per day (approximate; confirm current UWA tariff).'},
+   accommodations:[ L('Budget','Rwonyo Rest Camp (UWA)',30,'Park headquarters',['Bandas','Camping','Restaurant']), L('Mid-Range','Matana Tented Camp',150,'Inside the park',['Safari Tents','Lake Views','Restaurant']), L('Luxury','Mihingo Lodge',560,'Rocky hilltop above the savanna',['Infinity Pool','Spa','Horse Riding'])]},
+ { id:'rwenzori', name:'Rwenzori Mountains National Park', category:'park', region:'Western Uganda', tags:['Mountain Trekking','Glaciers','Bird Watching'], lat:0.3667, lng:29.95,
+   photo:'Rwenzori mountains FP.jpg',
+   description:'The legendary “Mountains of the Moon”: a UNESCO World Heritage site with snow-capped peaks and glaciers near the equator, giant heather and lobelia forests, and Africa’s third-highest peak.',
+   fauna:['Rwenzori Duiker','Forest Elephants','L’Hoest’s Monkeys','Three-Horned Chameleons','Rwenzori Turaco'],
+   activities:['Day Hikes from Nyakalengija','Multi-Day Central Circuit Trek','Cultural Walks with Bakonzo Guides','Bird Watching'],
+   pricing:{fnr:35,fr:30,eac:20000,unit:'Park entry per person per day (approximate). Guided multi-day treks cost far more; confirm with a trekking operator.'},
+   accommodations:[ L('Budget','Ruboni Community Camp',30,'Foothills near Nyakalengija',['Community Run','Mountain Views','Meals']), L('Mid-Range','Equator Snow Lodge',90,'Near Kasese on the trekking road',['Garden','Restaurant','Bar']), L('Luxury','Mweya Safari Lodge',490,'Queen Elizabeth NP, about 1.5 hours away',['Pool','Channel Views','Spa'],1800000)]},
+ { id:'mt-elgon', name:'Mount Elgon National Park', category:'park', region:'Eastern Uganda', tags:['Hiking','Caves','Bird Watching'], lat:1.1333, lng:34.5833,
+   photo:"Jackson's peak as you hike in Mt Elgon National park Uganda.jpg",
+   description:'An ancient extinct volcano with one of the largest volcanic bases on Earth, a vast caldera, hot springs, caves and waterfalls, with hikes up to Wagagai Peak (4,321 m).',
+   fauna:['Elephants','Buffaloes','Leopards','Jackson’s Francolin','Black-Collared Apalis'],
+   activities:['Sasa Trail Summit Hike','Caldera Hot Springs','Cave Exploration','Cultural Walks'],
+   pricing:{fnr:40,fr:30,eac:20000,unit:'Park entry per person per day (approximate). Gorilla permit holders may get one free entry day within 30 days of their trek.'},
+   accommodations:[ L('Budget','Suam Guest House (UWA)',25,'Near the Suam trailhead',['Basic Rooms','Meals on Request']), L('Mid-Range','Lacam Lodge',70,'Sipi, with falls views',['Falls Views','Restaurant','Bar']), L('Luxury','Sipi River Lodge',130,'Sipi, on the river',['Riverside Cottages','Coffee Tours','Restaurant'])]},
+ { id:'semuliki', name:'Semuliki National Park', category:'park', region:'Western Uganda', tags:['Hot Springs','Bird Watching','Congo Basin Forest'], lat:0.8333, lng:30.1,
+   photo:'A pond near the male hot spring in Semuliki National park.jpg',
+   description:'Uganda’s only lowland tropical rainforest, an eastern extension of the Congo Basin, famous for the Sempaya hot springs, forest birds, and Pygmy culture.',
+   fauna:['Forest Buffalo','Pygmy Hippo (rare)','Forest Birds (400+ species)','Chimpanzees','Monkeys'],
+   activities:['Sempaya Hot Springs Walk','Kirumia Trail Nature Walk','Bird Watching','Batwa/Bambuti Cultural Visit'],
+   pricing:{fnr:35,fr:30,eac:20000,unit:'Park entry per person per day (approximate; confirm current UWA tariff).'},
+   accommodations:[ L('Budget','Sempaya Rest Camp (UWA)',25,'Near Sempaya Gate',['Bandas','Camping','Restaurant']), L('Mid-Range','Ntoroko Game Lodge',120,'Lake Albert shore',['Lake Views','Restaurant','Boat Trips']), L('Luxury','Semliki Safari Lodge',520,'Toro-Semliki Wildlife Reserve',['Safari Tents','Pool','Game Drives'])]},
+ { id:'uwec-zoo', name:'UWEC - Entebbe Wildlife Zoo', category:'zoo', region:'Central Uganda', tags:['Zoo','Bird Watching','Conservation'], lat:0.05, lng:32.4667,
+   photo:'Feeding a giraffe - Uganda Wildlife Conservation Centre.jpg',
+   description:'Uganda Wildlife Conservation Education Centre (UWEC) in Entebbe: a sanctuary rescuing orphaned and confiscated wild animals, on the shore of Lake Victoria, 10 minutes from the airport.',
+   fauna:['Rescued Chimpanzees','Shoebill Storks','Lions','White Rhinos','Giraffes','Pythons'],
+   activities:['Behind-the-Scenes Zoo Tour','Keeper For a Day Experience','Chimpanzee Close Encounter'],
+   pricing:{fnr:15,fr:10,eac:10000,unit:'Day visit per person (approximate; confirm at uwec.ug).'},
+   accommodations:[ L('Budget','UWEC Zoo Cottages & Dorms',30,'Inside UWEC Grounds',['Lake Views','Direct Zoo Access','Wi-Fi'],110000), L('Mid-Range','2 Friends Entebbe Beach Hotel',120,'1.2 km from UWEC Zoo',['Outdoor Pool','Beachfront Dining','Airport Transfer'],440000), L('Luxury','Protea Hotel by Marriott Entebbe',280,'2.0 km on Lake Victoria Shore',['Lakeside Pool','Fitness Center','Airport Shuttle'],1000000)]},
+ { id:'ziwa-rhino', name:'Ziwa Rhino Sanctuary', category:'zoo', region:'Central Uganda', tags:['Rhino Tracking','Bird Watching','Shoebill'], lat:1.4833, lng:32.0953,
+   photo:'White Rhino (Ceratotherium simum) in Ziwa Rhino Sanctuary.jpg',
+   description:'The only place in Uganda to see wild southern white rhinos, tracked on foot with rangers. The sanctuary breeds rhinos for future return to national parks; the Lugogo swamp offers shoebill sightings.',
+   fauna:['White Rhinoceroses','Bushbucks','Oribi','Shoebill Storks','Monkeys'],
+   activities:['On-Foot Rhino Tracking with Rangers','Night Nature Walks','Canoe Birding in Lugogo Swamp'],
+   pricing:{fnr:50,fr:40,eac:30000,unit:'Rhino tracking per adult (about $25 for children, foreign non-residents).',verified:true},
+   accommodations:[ L('Budget','Ziwa Sanctuary Camp Grounds',20,'Inside Sanctuary Gate',['Camping Tents','Shared Baths','Firepit'],75000), L('Mid-Range','Ziwa Rhino Lodge',110,'0.5 km from Trek Headquarters',['Private Bungalows','Pool','Restaurant'],400000), L('Luxury','Amuka Safari Lodge',290,'Inside Sanctuary Woodland',['Pool','Luxury Chalets','Gourmet Dining'],1070000)]},
+ { id:'equator-kayabwe', name:'Uganda Equator Line, Kayabwe', category:'landmark', region:'Central Uganda', tags:['Landmark','Culture','Crafts'], lat:-0.0006, lng:32.0394,
+   photo:'',
+   description:'The famous geographic point on the Kampala–Masaka highway where the Northern and Southern Hemispheres meet. Watch water swirl in opposite directions and browse artisan craft shops.',
+   fauna:['Local Birdlife'],
+   activities:['Water Demonstration','Equator Monument Photos','Artisan Craft Shopping'],
+   pricing:{fnr:0,fr:0,eac:0,unit:'Free public access; demonstrations are tip-based.'},
+   accommodations:[ L('Budget','Equator Transit Inn Kayabwe',20,'0.3 km from Equator Monument',['Free Wi-Fi','En-suite Shower','Restaurant'],75000), L('Mid-Range','Aidah’s Equator Garden Hotel',65,'1.0 km along Masaka Highway',['Garden Lounge','Bar','Free Parking'],240000), L('Luxury','Lake Victoria Serena Golf Resort',260,'En-route to Entebbe',['Golf','Spa','Lakeside Dining'],960000)]},
+ { id:'jinja-nile', name:'Source of the Nile, Jinja', category:'landmark', region:'Eastern Uganda', tags:['White-Water Rafting','Bungee','Boat Trips'], lat:0.4237, lng:33.2039,
+   photo:'',
+   description:'Where Lake Victoria feeds the Nile, in Uganda’s adventure capital. Take a boat to the source, raft grade-5 rapids, kayak, bungee jump or ride quad bikes.',
+   fauna:['African Openbill','Nile Monitor Lizards','Kingfishers','Otters'],
+   activities:['Boat Trip to the Source','White-Water Rafting','Kayaking','Bungee Jumping'],
+   pricing:{fnr:10,fr:10,eac:10000,unit:'Approximate: gardens entry and boat trips are charged separately; rafting packages cost much more.'},
+   accommodations:[ L('Budget','Jinja Safari Hotel',35,'Jinja town',['Restaurant','Wi-Fi','Garden']), L('Mid-Range','Nile Hotel Jinja',95,'Jinja town',['Pool','Restaurant','Bar']), L('Luxury','Wildwaters Lodge',450,'Island on the Nile',['All-Inclusive','River Views','Spa'])]},
+ { id:'bunyonyi', name:'Lake Bunyonyi', category:'landmark', region:'South-Western Uganda', tags:['Lake','Canoeing','Birds'], lat:-1.2833, lng:29.9167,
+   photo:"A view of lake Bunyonyi and some of it's islands.jpg",
+   description:'“The place of many little birds”: a terraced, crater-like lake with 29 islands, cool evenings and calm water, a favorite rest stop between gorilla treks.',
+   fauna:['Grey Crowned Cranes','Weavers','Kingfishers','Otters'],
+   activities:['Dugout Canoe Trips','Island Hopping','Swimming','Terrace Hikes'],
+   pricing:{fnr:0,fr:0,eac:0,unit:'Free access; canoe and boat hire are charged locally.'},
+   accommodations:[ L('Budget','Bunyonyi Overland Resort',25,'Lake shore',['Camping','Dorms','Lake Views']), L('Mid-Range','Bird’s Nest Resort',95,'Lake shore',['Terrace Rooms','Restaurant','Canoes']), L('Luxury','Arcadia Lodge',160,'Lake shore',['Lake Cottages','Restaurant','Garden'])]},
+ { id:'sipi-falls', name:'Sipi Falls', category:'landmark', region:'Eastern Uganda', tags:['Waterfalls','Hiking','Coffee'], lat:1.3344, lng:34.39,
+   photo:'Sipi Falls in Uganda.jpg',
+   description:'Three cascades on the Sipi River at the foot of Mount Elgon, the tallest dropping about 100 m, with coffee tours, abseiling and views over the Karamoja plains.',
+   fauna:['Colobus Monkeys','Forest Birds','Butterflies'],
+   activities:['Three-Falls Guided Hike','Abseiling','Coffee Tour','Cave Walk'],
+   pricing:{fnr:10,fr:10,eac:10000,unit:'Approximate guide and entrance fees; hiking and abseiling cost extra.'},
+   accommodations:[ L('Budget','The Crow’s Nest',20,'Sipi village',['Falls Views','Bar','Camping']), L('Mid-Range','Lacam Lodge',70,'Overlooking the main drop',['Falls Views','Restaurant','Bar']), L('Luxury','Sipi Falls Resort',140,'Sipi village',['Cottages','Restaurant','Views'])]},
+ { id:'kasubi', name:'Kasubi Tombs, Kampala', category:'landmark', region:'Central Uganda', tags:['UNESCO','Culture','History'], lat:0.3292, lng:32.5533,
+   photo:'Kampala Kasubi Tombs.jpg',
+   description:'UNESCO World Heritage burial grounds of four Kabakas (kings) of Buganda, centered on a vast thatched dome of reeds and bark cloth, about 5 km from central Kampala.',
+   fauna:[],
+   activities:['Guided Cultural Tour','Bark-Cloth Craft Demos','Royal Drum Display'],
+   pricing:{fnr:10,fr:10,eac:5000,unit:'Approximate entry fee per person; confirm on arrival.'},
+   accommodations:[ L('Budget','Red Chilli Hideaway',30,'Kampala (Bukoto)',['Pool','Restaurant','Bar']), L('Mid-Range','Fairway Hotel & Spa',110,'Kampala (Kololo)',['Pool','Restaurant','Spa']), L('Luxury','Kampala Serena Hotel',300,'Kampala city centre',['Pool','Spa','Fine Dining'])]},
+ { id:'entebbe-botanical', name:'Entebbe Botanical Gardens', category:'landmark', region:'Central Uganda', tags:['Gardens','Birding','Lake Victoria'], lat:0.062, lng:32.4793,
+   photo:'Entebbe Botanical Gardens 1.jpg',
+   description:'A lakeside garden founded in 1898, with giant trees, black-and-white colobus monkeys and over 100 bird species, a calm first stop minutes from Entebbe airport.',
+   fauna:['Black-and-White Colobus','Weaver Birds','Shoebills (occasional)','Monitor Lizards'],
+   activities:['Bird Watching','Forest Walk','Lakeshore Picnic','Boat Ride'],
+   pricing:{fnr:5,fr:5,eac:5000,unit:'Approximate entry per person; guides are available at the gate.'},
+   accommodations:[ L('Budget','Entebbe Backpackers',20,'Entebbe town',['Dorms','Garden','Bar']), L('Mid-Range','2 Friends Entebbe Beach Hotel',120,'Near the lakeshore',['Pool','Beachfront Dining','Airport Transfer'],440000), L('Luxury','Protea Hotel by Marriott Entebbe',280,'Lake Victoria Shore',['Lakeside Pool','Fitness Center','Airport Shuttle'],1000000)]}
+];
+const byId = id => ugandaDestinations.find(d => d.id === id);
+const fmtUgx = n => Math.round(n).toLocaleString('en-US') + ' UGX';
+const regions = ['All regions', ...new Set(ugandaDestinations.map(d=>d.region))];
+const favs = new Set();
+let activeFilter='all', currentId=null, tierView='All', calcTier='Mid-Range';
+const minRate = d => Math.min(...d.accommodations.map(a=>a.rateUsd));
+const verifiedBadge = d => d.pricing.verified ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">✔ UWA tariff</span>' : (d.pricing.fnr===0?'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">FREE ENTRY</span>':'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">≈ approx</span>');
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+function observeReveal(){ const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){e.target.classList.add('in'); io.unobserve(e.target);} }),{threshold:.1}); document.querySelectorAll('.reveal:not(.in)').forEach(el=>io.observe(el)); }
+function countTo(id,to,prefix=''){ const el=document.getElementById(id); let n=0; const iv=setInterval(()=>{ n+=Math.ceil(to/20); if(n>=to){n=to;clearInterval(iv);} el.textContent=prefix+n; },40); }
+
+/* ---------- Grid ---------- */
+const filterDefs=[['all','All','bg-emerald-500'],['park','National Parks','bg-sky-500'],['zoo','Zoos & Sanctuaries','bg-violet-500'],['landmark','Landmarks & Nature','bg-amber-500'],['fav','♥ Favorites','bg-rose-500']];
+function renderFilters(){ document.getElementById('filters').innerHTML=filterDefs.map(([k,l,c])=>`<button onclick="setFilter('${k}')" class="chip px-4 py-2 rounded-full text-xs font-bold shadow-sm ${activeFilter===k?c+' text-white':'bg-white text-gray-600 border border-gray-200'}">${l}</button>`).join(''); }
+function setFilter(k){ activeFilter=k; renderFilters(); renderGrid(); }
+function renderGrid(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const reg=document.getElementById('region').value, budget=+document.getElementById('budget').value;
+  document.getElementById('budget-label').textContent = budget>=900?'any':'$'+budget;
+  const list=ugandaDestinations.filter(d=>
+    (activeFilter==='all'||(activeFilter==='fav'?favs.has(d.id):d.category===activeFilter)) &&
+    (reg==='All regions'||d.region===reg) && (budget>=900||minRate(d)<=budget) &&
+    (!q||[d.name,d.region,d.description,...d.tags,...d.fauna,...d.activities,...d.accommodations.map(a=>a.name)].join(' ').toLowerCase().includes(q)));
+  const g=document.getElementById('dest-grid');
+  if(!list.length){ g.innerHTML=`<div class="col-span-full text-center py-16 text-gray-400"><div class="text-5xl mb-2">🦒</div>Nothing matches yet. Try another search or filter.</div>`; return; }
+  g.innerHTML=list.map(d=>{ const p=d.pricing; const price=p.fnr===0?'Free entry':(p.oneOff?`Permit $${p.fnr}`:`Entry $${p.fnr}/day`);
+    return `<div class="card reveal bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-md cursor-pointer" style="--accent:${P[d.id][2]}66" onclick="openDetail('${d.id}')" onmousemove="tilt(event,this)" onmouseleave="this.style.transform=''">
+      <div class="scene relative overflow-hidden">${sceneWithPhoto(d,'h-48',700)}
+        <button onclick="event.stopPropagation();toggleFav('${d.id}')" class="absolute top-3 right-3 bg-white/90 rounded-full p-2 shadow hover:scale-110 transition z-10"><i data-lucide="heart" class="heart w-4 h-4 text-gray-500 ${favs.has(d.id)?'on':''}"></i></button>
+        <span class="absolute bottom-3 left-3 text-[10px] font-black uppercase tracking-wider text-white px-2.5 py-1 rounded-full shadow z-10" style="background:${P[d.id][2]}">${d.category}</span>
+      </div>
+      <div class="p-5 space-y-2">
+        <h3 class="font-black text-gray-900 leading-tight">${d.name}</h3>
+        <p class="text-xs text-gray-500 flex items-center"><i data-lucide="map-pin" class="w-3 h-3 mr-1" style="color:${P[d.id][2]}"></i>${d.region}</p>
+        <div class="flex flex-wrap gap-1.5">${d.tags.map(t=>`<span class="text-[10px] px-2 py-0.5 rounded-full font-bold" style="background:${P[d.id][2]}22;color:${P[d.id][0]}">${t}</span>`).join('')}</div>
+        <p class="text-xs text-gray-600 line-clamp-2">${d.description}</p>
+        <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
+          <span class="font-black text-emerald-700">${price}</span><span class="text-gray-500">Beds from <b class="text-orange-500">$${minRate(d)}</b></span>${verifiedBadge(d)}
+        </div></div></div>`}).join('');
+  lucide.createIcons(); observeReveal();
+}
+function tilt(e,el){ const r=el.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5; el.style.transform=`perspective(700px) rotateY(${x*8}deg) rotateX(${-y*8}deg) translateY(-6px)`; }
+function toggleFav(id){ favs.has(id)?favs.delete(id):favs.add(id); document.getElementById('fav-count').textContent=favs.size; toast(favs.has(id)?'Added to favorites ♥':'Removed from favorites'); renderGrid(); if(currentId===id) paintModalFav(); }
+
+/* ---------- Detail modal ---------- */
+function paintModalFav(){ document.getElementById('modal-fav').innerHTML=`<i data-lucide="heart" class="heart w-6 h-6 text-red-400 ${favs.has(currentId)?'on':''}"></i>`; lucide.createIcons(); }
+function openDetail(id){
+  const d=byId(id); currentId=id; tierView='All';
+  document.getElementById('modal-scene').innerHTML=sceneWithPhoto(d,'h-64',1100);
+  document.getElementById('modal-credit').innerHTML = d.photo
+    ? `Photo: Wikimedia Commons contributor · <a class="underline" target="_blank" rel="noopener" href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(d.photo.replace(/ /g,'_'))}">view file and license</a> (illustration shown if the photo cannot load)`
+    : 'No verified photo found for this place, so an illustration is shown.';
+  document.getElementById('modal-title').textContent=d.name;
+  document.getElementById('modal-region').textContent=d.region;
+  document.getElementById('modal-desc').textContent=d.description;
+  document.getElementById('modal-fauna').innerHTML=(d.fauna.length?d.fauna:['Cultural & heritage site']).map(f=>`<li class="px-2.5 py-1 rounded-full bg-white border border-emerald-200 font-semibold hover:bg-emerald-500 hover:text-white transition cursor-default">${f}</li>`).join('');
+  document.getElementById('modal-activities').innerHTML=d.activities.map((f,i)=>`<li class="flex items-center gap-2"><span class="w-5 h-5 rounded-full bg-orange-400 text-white text-[10px] font-black flex items-center justify-center">${i+1}</span>${f}</li>`).join('');
+  const p=d.pricing, free=p.fnr===0;
+  document.getElementById('modal-pricing').innerHTML=[['Foreign Non-Resident',free?'FREE':'$'+p.fnr,'from-sky-400 to-blue-500'],['Foreign Resident',free?'FREE':'$'+p.fr,'from-emerald-400 to-teal-500'],['East African',free?'FREE':fmtUgx(p.eac),'from-orange-400 to-rose-500']]
+    .map(([l,v,g])=>`<div class="rounded-xl p-3 text-white bg-gradient-to-br ${g} hover:scale-105 transition"><div class="text-[10px] opacity-90">${l}</div><div class="font-black text-sm">${v}</div></div>`).join('');
+  document.getElementById('modal-pricing-unit').textContent=p.unit; document.getElementById('modal-verified').innerHTML=verifiedBadge(d);
+  document.getElementById('modal-fav').onclick=()=>toggleFav(id);
+  document.getElementById('modal-estimate').onclick=()=>{ closeModal('detail-modal'); openBookingModal(id); };
+  paintModalFav(); renderTiers();
+  document.getElementById('detail-modal').classList.remove('hidden'); document.body.style.overflow='hidden'; lucide.createIcons();
+}
+function renderTiers(){
+  const d=byId(currentId);
+  document.getElementById('tier-tabs').innerHTML=['All','Budget','Mid-Range','Luxury'].map(t=>`<button onclick="tierView='${t}';renderTiers()" class="px-3 py-1.5 rounded-full transition ${tierView===t?'bg-emerald-500 text-white shadow':'text-gray-500 hover:text-emerald-600'}">${t}</button>`).join('');
+  const col={Budget:['bg-emerald-100 text-emerald-800','border-emerald-300'],'Mid-Range':['bg-sky-100 text-sky-800','border-sky-300'],Luxury:['bg-amber-100 text-amber-800','border-amber-300']};
+  document.getElementById('modal-accommodations-list').innerHTML=d.accommodations.filter(a=>tierView==='All'||a.tier===tierView).map(a=>`
+    <div class="modal-in bg-white border-2 ${col[a.tier][1]} rounded-2xl p-4 space-y-2 hover:-translate-y-1 hover:shadow-lg transition ${tierView!=='All'?'md:col-span-3':''}">
+      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${col[a.tier][0]}">${a.tier}</span>
+      <h5 class="font-bold text-sm text-gray-900">${a.name}</h5>
+      <p class="text-[11px] text-gray-500">📍 ${a.distance}</p>
+      <p class="text-lg font-black text-orange-500">$${a.rateUsd} <span class="text-[10px] text-gray-500 font-medium">/ ${fmtUgx(a.rateUgx)} per night</span></p>
+      <div class="flex flex-wrap gap-1">${a.amenities.map(x=>`<span class="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">${x}</span>`).join('')}</div>
+    </div>`).join('');
+}
+function closeModal(id){ document.getElementById(id).classList.add('hidden'); document.body.style.overflow=''; }
+
+/* ---------- Estimator (uses the real lodge rates of the chosen site) ---------- */
+const tiersDef=[['none','None'],['Budget','Budget'],['Mid-Range','Mid'],['Luxury','Luxury']];
+function paintTierBtns(){
+  const d=byId(document.getElementById('calc-site').value);
+  document.getElementById('calc-tier').innerHTML=tiersDef.map(([k,l])=>{ const a=d.accommodations.find(x=>x.tier===k); const price=k==='none'?'—':'$'+a.rateUsd;
+    return `<button type="button" onclick="calcTier='${k}';paintTierBtns();updateCalcTotal()" class="py-2 rounded-xl border-2 transition ${calcTier===k?'border-orange-500 bg-orange-50 text-orange-600 scale-105':'border-gray-200 text-gray-500 hover:border-orange-300'}">${l}<div class="font-black">${price}</div></button>`}).join('');
+}
+function openBookingModal(id){
+  const sel=document.getElementById('calc-site');
+  if(!sel.options.length) sel.innerHTML=ugandaDestinations.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  if(typeof id==='string') sel.value=id;
+  paintTierBtns(); document.getElementById('booking-modal').classList.remove('hidden'); document.body.style.overflow='hidden';
+  updateCalcTotal(); lucide.createIcons();
+}
+function step(id,delta,min){ const el=document.getElementById(id); el.value=Math.max(min,Math.min(30,+el.value+delta)); updateCalcTotal(); }
+let shownTotal=0;
+function updateCalcTotal(){
+  const d=byId(document.getElementById('calc-site').value);
+  const res=document.getElementById('calc-residency').value, usd=res!=='eac';
+  const days=+document.getElementById('calc-days').value; document.getElementById('days-label').textContent=days;
+  const adults=+document.getElementById('calc-adults').value, kids=+document.getElementById('calc-children').value;
+  const rooms=Math.ceil((adults+kids)/2), lodge_=d.accommodations.find(a=>a.tier===calcTier);
+  const rate=lodge_?(usd?lodge_.rateUsd:lodge_.rateUgx):0;
+  const oneOff=!!d.pricing.oneOff;
+  const entry=d.pricing[res]*(oneOff?adults:(adults+kids*.5))*(oneOff?1:days), lodge=rate*rooms*days, total=entry+lodge;
+  const f=v=>usd?'$'+Math.round(v).toLocaleString('en-US'):fmtUgx(v);
+  document.getElementById('calc-lodge-name').textContent=lodge_?`${lodge_.name} · ${rooms} room${rooms>1?'s':''} (2 per room)`:'No accommodation included';
+  document.getElementById('calc-breakdown').innerHTML=
+    `<div class="flex justify-between"><span>🎟 ${oneOff?'Permits (one-off)':'Entry'} (${adults} adult${adults>1?'s':''}${!oneOff&&kids?`, ${kids} child${kids>1?'ren':''} at ½`:''})</span><b>${f(entry)}</b></div>`+
+    `<div class="flex justify-between"><span>🛏 Lodging (${rooms} room${rooms>1?'s':''} × ${days} night${days>1?'s':''})</span><b>${f(lodge)}</b></div>`+
+    (oneOff&&kids?`<div class="text-yellow-200">Permit sites have minimum ages (gorillas 15+, chimps 12+), so children aren’t charged a permit here.</div>`:'')+
+    (d.pricing.verified?'':`<div class="text-yellow-200">Entry fee for this site is approximate.</div>`);
+  document.getElementById('bar-entry').style.width=(total?entry/total*100:0)+'%'; document.getElementById('bar-lodge').style.width=(total?lodge/total*100:0)+'%';
+  const from=shownTotal, t0=performance.now(); shownTotal=total; const el=document.getElementById('calc-total-price');
+  (function tick(t){ const p=Math.min(1,(t-t0)/400); el.textContent=f(from+(total-from)*p)+(usd?' USD':''); if(p<1) requestAnimationFrame(tick); })(t0);
+}
+function handleInquirySubmit(e){ e.preventDefault(); closeModal('booking-modal'); toast('🎉 Inquiry sent! (demo only)'); }
+
+/* ---------- Map ---------- */
+let map, markers={};
+function initMap(){
+  map=L.map('map').setView([1.0,32.0],7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+  ugandaDestinations.forEach(d=>{
+    const icon=L.divIcon({className:'',html:`<div style="background:${P[d.id][2]};width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 4px 10px #0005"></div>`,iconSize:[28,28],iconAnchor:[14,28]});
+    markers[d.id]=L.marker([d.lat,d.lng],{icon}).addTo(map).bindPopup(`<b>${d.name}</b><br>${d.region}<br>Beds from $${minRate(d)}/night<br><a href="#" onclick="openDetail('${d.id}');return false">View details →</a>`);
+  });
+  document.getElementById('map-list').innerHTML=ugandaDestinations.map(d=>`
+    <button onclick="flyTo('${d.id}')" class="w-full flex items-center gap-3 bg-white rounded-2xl p-2 shadow hover:shadow-lg hover:-translate-x-1 transition text-left border-l-4" style="border-color:${P[d.id][2]}">
+      <div class="w-20 h-14 rounded-xl overflow-hidden shrink-0 relative">${sceneSVG(d,'h-14')}${photoTag(d,300)}</div>
+      <div><div class="text-sm font-bold leading-tight">${d.name}</div><div class="text-[11px] text-gray-500">${d.region} · from $${minRate(d)}</div></div>
+    </button>`).join('');
+}
+function flyTo(id){ const d=byId(id); map.flyTo([d.lat,d.lng],10,{duration:1.2}); markers[id].openPopup(); }
+
+/* ---------- Stories ---------- */
+const stories=[
+  {n:'Amara',s:'bwindi',r:5,t:'An hour with a gorilla family. I cried, honestly. Our guides were incredible.'},
+  {n:'Tom & Lisa',s:'murchison',r:5,t:'The boat ride to the base of the falls was loud, wet and wonderful. Hippos everywhere!'},
+  {n:'Joseph',s:'ziwa-rhino',r:4,t:'Walking up to wild rhinos on foot is something else. Great rangers.'}];
+let starVal=5;
+function paintStars(){ document.getElementById('st-stars').innerHTML=[1,2,3,4,5].map(i=>`<span class="star text-2xl ${i<=starVal?'text-amber-400':'text-gray-300'}" onclick="starVal=${i};paintStars()">★</span>`).join(''); }
+function renderStories(){ document.getElementById('stories').innerHTML=stories.map(s=>{const d=byId(s.s);return `
+  <div class="bg-white rounded-2xl overflow-hidden shadow flex hover:shadow-xl transition">
+    <div class="w-32 sm:w-44 shrink-0 relative">${sceneSVG(d,'h-full min-h-[120px]')}${photoTag(d,400)}</div>
+    <div class="p-4 space-y-1"><div class="text-amber-400 text-sm">${'★'.repeat(s.r)}<span class="text-gray-300">${'★'.repeat(5-s.r)}</span></div>
+      <p class="text-sm text-gray-700">“${s.t}”</p><p class="text-xs font-bold" style="color:${P[d.id][2]}">${s.n} · ${d.name}</p></div></div>`}).join(''); }
+function addStory(e){ e.preventDefault(); stories.unshift({n:document.getElementById('st-name').value,s:document.getElementById('st-site').value,r:starVal,t:document.getElementById('st-text').value}); e.target.reset(); renderStories(); toast('Story posted! 📸'); }
+
+/* ---------- Tabs & init ---------- */
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.add('hidden')); document.getElementById('tab-'+tab).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.className='nav-btn px-4 py-2 rounded-full text-sm font-medium transition-all text-white/90 hover:bg-white/20');
+  const nb=document.getElementById('nav-'+tab); if(nb) nb.className='nav-btn px-4 py-2 rounded-full text-sm font-bold transition-all bg-white text-emerald-700 shadow';
+  document.getElementById('mobile-menu').classList.add('hidden');
+  if(tab==='map-view'){ if(!map) initMap(); setTimeout(()=>map.invalidateSize(),60); }
+  lucide.createIcons();
+}
+document.getElementById('mobile-menu-btn').onclick=()=>document.getElementById('mobile-menu').classList.toggle('hidden');
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal('detail-modal'); closeModal('booking-modal'); } });
+const heroD={...byId('murchison'),photo:'Giraffe in Murchison Falls National Park Uganda 01.jpg'};
+document.getElementById('hero-scene').innerHTML=`<div class="relative">${sceneWithPhoto(heroD,'h-56 sm:h-72',1400)}<div class="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent flex items-center"><div class="p-6 sm:p-10 text-white max-w-md"><h1 class="text-3xl sm:text-4xl font-black leading-tight">Discover the <span class="text-yellow-300">Pearl of Africa</span></h1><p class="text-sm mt-2 text-white/90">Parks, zoos, waterfalls and landmarks, with lodges and hotel prices for every budget.</p><button onclick="document.getElementById('dest-grid').scrollIntoView({behavior:'smooth'})" class="mt-4 px-5 py-2.5 rounded-full bg-yellow-300 text-emerald-900 font-black text-sm hover:scale-105 transition">Start exploring ↓</button></div></div></div>`;
+document.getElementById('region').innerHTML=regions.map(r=>`<option>${r}</option>`).join('');
+document.getElementById('st-site').innerHTML=ugandaDestinations.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+countTo('stat-dest',ugandaDestinations.length); countTo('stat-lodge',ugandaDestinations.reduce((n,d)=>n+d.accommodations.length,0));
+document.getElementById('stat-from').textContent='$'+Math.min(...ugandaDestinations.map(minRate));
+paintStars(); renderStories(); renderFilters(); renderGrid(); switchTab('explore');
+</script>
+</body>
+</html>
